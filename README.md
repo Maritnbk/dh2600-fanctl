@@ -52,19 +52,29 @@ docker compose logs -f
 | 项 | 值 |
 |---|---|
 | 镜像地址 | `ghcr.io/maritnbk/dh2600-fanctl` |
-| 当前版本 | `v1.0`（也打 `latest`） |
+| 当前版本 | `v1.0`（也打 `1.0`、`latest`） |
 | 架构 | `linux/amd64` |
 | 基础镜像 | `python:3.12-slim` |
-
-可用标签：`v1.0`、`1.0`、`1`、`latest`、`main`。
+| 大小 | 158 MB |
 
 ```bash
-# 查看所有版本
+# 拉取
 docker pull ghcr.io/maritnbk/dh2600-fanctl:v1.0
+
+# 或固定到次版本 / 最新
+docker pull ghcr.io/maritnbk/dh2600-fanctl:1.0
 docker pull ghcr.io/maritnbk/dh2600-fanctl:latest
 ```
 
 镜像由 GitHub Actions 在打 tag 时自动构建发布，见 `.github/workflows/docker.yml`。
+标签规则：
+
+| Git 标签 | 生成的镜像标签 |
+|---|---|
+| `v1.0` | `v1.0`、`1.0`、`latest` |
+| `v1.2.3` | `v1.2.3`、`1.2.3`、`1.2`、`1`、`latest` |
+| `main` 分支推送 | `main`、`latest` |
+
 
 ---
 
