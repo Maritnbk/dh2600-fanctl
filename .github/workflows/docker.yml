@@ -38,12 +38,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 自己算标签，避免 metadata-action 的 semver 规则在 v1.0（两段式）上报错
+      # 自己算标签，避免 metadata-action 的 semver 规则在 v1.0（两段式）上报错。
+      # 注意：GHCR 要求仓库名全小写，而 GitHub 用户名可能含大写（如 Maritnbk）。
       - name: Compute image tags
         id: tags
         run: |
           set -euo pipefail
-          IMG="${REGISTRY}/${IMAGE_NAME}"
+          IMG="${REGISTRY}/$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')"
           TAGS=""
           REF_TYPE="${{ github.ref_type }}"
           REF_NAME="${{ github.ref_name }}"
