@@ -44,6 +44,8 @@ class Controller:
             "mode": "auto",
             "rpm": {"cpu": None, "sys": None},
             "temps": {},
+            # applied 仅记录「上次写入的 PWM」，用于展示；
+            # 不作为「值已生效」的判断依据（hwmonitor 会抢回）。
             "applied": {"cpu": None, "sys": None},
             "target": {"cpu": None, "sys": None},
             "status": "starting",       # running | suspended | error | stopped
@@ -217,15 +219,16 @@ class Controller:
         self._set(status="running")
 
     def _apply(self, target: dict, now: float):
-        with self._lock:
-            applied = dict(self.state["applied"])
+        """每 tick 无条件重写两路 PWM。
 
+        不能做「值不变就跳过」的优化：hwmonitor 会在温度漂移时抢回控制权，
+        而它的重写不改变我们的目标值，一旦缓存命中就再也不会重写，
+        导致手动模式下设定值几秒后就被覆盖且无法恢复。
+        """
         for key, setter in (("cpu", self.fan.set_cpu), ("sys", self.fan.set_sys)):
             want = target.get(key)
             if want is None:
                 continue
-            if applied.get(key) == want:
-                continue          # 减少无谓写入
             setter(want)
             with self._lock:
                 self.state["applied"][key] = want

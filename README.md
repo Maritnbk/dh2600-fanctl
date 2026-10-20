@@ -108,7 +108,7 @@ docker pull ghcr.io/maritnbk/dh2600-fanctl:1.0
 | 卷 | `/sys/class/hwmon:/host/hwmon:ro` | 温度源 |
 | 卷 | `/sys/devices:/host/devices:ro` | 温度源符号链接解析 |
 | 卷 | `/etc/default:/host/default:ro` | UGOS 曲线参数 |
-| 环境 | `INTERVAL=3` | 写入间隔（秒），2–5 之间较合适 |
+| 环境 | `INTERVAL=2` | 写入间隔（秒），建议 2–3，必须小于 hwmonitor 抢回周期 |
 | 环境 | `TOKEN=...` | 访问令牌，留空则不鉴权 |
 
 
@@ -137,12 +137,22 @@ docker pull ghcr.io/maritnbk/dh2600-fanctl:1.0
 
 ## 为什么需要"持续写入"
 
-`hwmonitor` 的 `setFanLimit()` 在温度漂移、目标 PWM 变化时会重新写入 `/proc/it86/fan`，覆盖外部设定：
+`hwmonitor` 的 `setFanLimit()` 在温度漂移、目标 PWM 变化时会重新写入 `/proc/it86/fan`，覆盖外部设定。
 
-- `mode 2`（均衡）：外部值约能撑 **3 分钟**
-- `mode 3`（性能）：约 **12 秒**就被覆盖
+实测（`mode 2`，容器停止状态下手工写入）：
 
-所以控制器每 `INTERVAL` 秒重写一次。这不是缺陷——容器崩了，`hwmonitor` 自动接管，等于免费的安全网。
+| 风扇 | 保持时间 |
+|---|---|
+| CPU 风扇（`cpu N`） | 约 **27 秒**（CPU 温度波动剧烈，抢占最快） |
+| 系统风扇（`set N`） | 约 **3 分钟** |
+
+因此控制器**每个 tick 都无条件重写两路 PWM**，不做「值没变就跳过」的优化——
+因为 `hwmonitor` 的重写不会改变我们的目标值，一旦跳过就再也不会重写，
+手动模式下设定值会在几秒后失效且无法恢复。
+
+`INTERVAL` 默认 2 秒，远小于最短抢占周期（27 秒），留足余量。
+
+这不是缺陷——容器崩了，`hwmonitor` 自动接管，等于免费的安全网。
 
 ---
 

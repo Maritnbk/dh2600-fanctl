@@ -20,7 +20,9 @@ services:
       # UGOS 曲线参数（只读参考）
       - /etc/default:/host/default:ro
     environment:
-      - INTERVAL=3
+      # 写入间隔（秒）。必须小于 hwmonitor 的抢回周期：
+      # CPU 风扇约 27 秒、系统风扇约 3 分钟，取 2 秒留足余量。
+      - INTERVAL=2
       # 留空则不鉴权（仅限纯内网）。建议设置一个随机串。
       - TOKEN=${FANCTL_TOKEN:-}
     healthcheck:
