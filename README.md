@@ -14,36 +14,53 @@
 
 ## 快速开始
 
-### 方式一：用预构建镜像（推荐）
+默认 `docker-compose.yml` 已经配置为使用预构建镜像，直接启动即可：
 
 ```bash
-docker pull ghcr.io/maritnbk/dh2600-fanctl:1.0
-```
-
-`docker-compose.yml` 里把 `build:` 换成 `image:`：
-
-```yaml
-services:
-  fanctl:
-    image: ghcr.io/maritnbk/dh2600-fanctl:1.0
-    # build: ...  ← 删掉或用注释掉
-```
-
-然后 `docker compose up -d`。
-
-### 方式二：本地构建
-
-```bash
-cd /volume1/docker/fanctl
-
 # 可选：设置访问令牌（留空则不鉴权，仅限纯内网）
 export FANCTL_TOKEN=$(openssl rand -hex 16)
 
-docker compose up -d --build
+docker compose up -d
 docker compose logs -f
 ```
 
 访问 `http://<NAS-IP>:2600`。
+
+### 升级
+
+镜像 tag 固定为 `latest`，**升级不需要改动 `docker-compose.yml`**：
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+### 锁定版本
+
+如果不想跟随 `latest`，把 `docker-compose.yml` 里的 `image:` 改成具体版本：
+
+```yaml
+image: ghcr.io/maritnbk/dh2600-fanctl:1.0
+```
+
+### 本地构建（开发用）
+
+改代码后想自己构建，加 `--build` 并指定 `build` 上下文：
+
+```bash
+docker compose up -d --build
+```
+
+或在 `docker-compose.yml` 里恢复：
+
+```yaml
+services:
+  fanctl:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dh2600-fanctl:latest
+```
 
 ---
 
@@ -52,18 +69,18 @@ docker compose logs -f
 | 项 | 值 |
 |---|---|
 | 镜像地址 | `ghcr.io/maritnbk/dh2600-fanctl` |
-| 当前版本 | `1.0`（也打 `latest`） |
+| 默认 tag | `latest`（跟随最新发布） |
+| 固定版本 | `1.0` |
 | 架构 | `linux/amd64` |
 | 基础镜像 | `python:3.12-slim` |
 | 大小 | 158 MB |
 
 ```bash
-# 拉取
-docker pull ghcr.io/maritnbk/dh2600-fanctl:1.0
-
-# 或固定到次版本 / 最新
-docker pull ghcr.io/maritnbk/dh2600-fanctl:1.0
+# 跟随最新（默认）
 docker pull ghcr.io/maritnbk/dh2600-fanctl:latest
+
+# 固定到具体版本
+docker pull ghcr.io/maritnbk/dh2600-fanctl:1.0
 ```
 
 镜像由 GitHub Actions 在打 tag 时自动构建发布，见 `.github/workflows/docker.yml`。
@@ -218,7 +235,7 @@ md5sum /lib/modules/$(uname -r)/kernel/drivers/ugreen/dh2600/ug_it86x-sio-dh2600
 
 ```bash
 docker compose down
-docker rmi dh2600-fanctl:latest
+docker rmi ghcr.io/maritnbk/dh2600-fanctl:latest
 rm -rf /volume1/docker/fanctl
 ```
 

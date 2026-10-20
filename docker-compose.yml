@@ -1,9 +1,9 @@
 services:
   fanctl:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: dh2600-fanctl:latest
+    # 使用预构建镜像，tag 固定为 latest：
+    # 镜像更新后只需 `docker compose pull && docker compose up -d`，
+    # 无需改动本文件。
+    image: ghcr.io/maritnbk/dh2600-fanctl:latest
     container_name: dh2600-fanctl
     restart: unless-stopped
     network_mode: bridge
