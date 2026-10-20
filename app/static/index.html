@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08090c">
+<title>DH2600 · 风扇控制</title>
+<style>
+  :root {
+    --bg: #08090c;
+    --card: rgba(255,255,255,.032);
+    --card-hi: rgba(255,255,255,.055);
+    --line: rgba(255,255,255,.075);
+    --line-hi: rgba(255,255,255,.14);
+    --txt: #eef1f7;
+    --dim: #8a92a6;
+    --dim2: #5d6478;
+    --blue: #5b9dff;
+    --teal: #35d6a4;
+    --amber: #ffb545;
+    --red: #ff5f6d;
+    --r: 18px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    padding: 28px 20px 56px;
+    background:
+      radial-gradient(900px 500px at 12% -8%, rgba(91,157,255,.14), transparent 62%),
+      radial-gradient(760px 460px at 92% 4%, rgba(53,214,164,.09), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+    color: var(--txt);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    max-width: 1000px;
+    margin-inline: auto;
+  }
+
+  .num, .mono {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 22px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 38px; height: 38px; border-radius: 11px; flex: none;
+    background: linear-gradient(145deg, rgba(91,157,255,.9), rgba(53,214,164,.65));
+    display: grid; place-items: center;
+    box-shadow: 0 6px 20px -6px rgba(91,157,255,.55);
+  }
+  .logo svg { width: 20px; height: 20px; }
+  h1 { font-size: 17px; font-weight: 620; margin: 0; letter-spacing: -.01em; }
+  .sub { color: var(--dim2); font-size: 12px; margin-top: 1px; letter-spacing: .01em; }
+
+  .pills { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; padding: 6px 12px; border-radius: 999px;
+    background: var(--card); border: 1px solid var(--line);
+    color: var(--dim); white-space: nowrap;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim2); flex: none; }
+  .dot.ok { background: var(--teal); box-shadow: 0 0 0 3px rgba(53,214,164,.16); }
+  .dot.warn { background: var(--amber); box-shadow: 0 0 0 3px rgba(255,181,69,.16); }
+  .dot.bad { background: var(--red); box-shadow: 0 0 0 3px rgba(255,95,109,.16); }
+  .dot.live { animation: pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: .35; }
+  }
+
+  /* ---------- 卡片 ---------- */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 20px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .card h2 {
+    font-size: 11px; font-weight: 600; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--dim2);
+    margin: 0 0 16px;
+  }
+
+  .grid { display: grid; gap: 14px; }
+  .hero { grid-template-columns: 1fr 1fr; }
+  .stack { display: grid; gap: 14px; }
+  @media (max-width: 760px) {
+    .hero { grid-template-columns: 1fr; }
+    body { padding: 20px 14px 44px; }
+  }
+
+  /* ---------- 仪表盘 ---------- */
+  .fan { position: relative; text-align: center; padding: 6px 0 2px; }
+  .fan svg.gauge { width: 100%; max-width: 220px; height: auto; display: block; margin: 0 auto; }
+  .gauge .track { fill: none; stroke: rgba(255,255,255,.07); stroke-width: 9; stroke-linecap: round; }
+  .gauge .arc {
+    fill: none; stroke-width: 9; stroke-linecap: round;
+    transition: stroke-dashoffset .7s cubic-bezier(.22,1,.36,1);
+    filter: drop-shadow(0 0 8px rgba(91,157,255,.45));
+  }
+  .gauge.cpu .arc { stroke: var(--teal); filter: drop-shadow(0 0 8px rgba(53,214,164,.45)); }
+  .gauge.sys .arc { stroke: var(--blue); }
+  .gauge .tick { stroke: rgba(255,255,255,.10); stroke-width: 1.5; stroke-linecap: round; }
+  .gauge-center {
+    position: absolute; inset: 0; display: grid; place-content: center;
+    pointer-events: none; padding-bottom: 12px;
+  }
+  .fan .rpmval {
+    font-size: 38px; font-weight: 620; letter-spacing: -.025em;
+    line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .fan .unit { font-size: 11px; color: var(--dim2); letter-spacing: .12em; margin-top: 5px; }
+  .fan .fanlabel {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    margin-top: 10px; font-size: 13px; color: var(--dim);
+  }
+  .fan .fanlabel b { color: var(--txt); font-weight: 550; }
+  .swatch { width: 8px; height: 8px; border-radius: 3px; }
+  .swatch.cpu { background: var(--teal); }
+  .swatch.sys { background: var(--blue); }
+  .tgt { font-size: 12px; color: var(--dim2); margin-top: 4px; }
+  .tgt b { color: var(--dim); font-weight: 500; }
+
+  /* ---------- 温度 ---------- */
+  .temps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  @media (max-width: 560px) { .temps { grid-template-columns: repeat(2, 1fr); } }
+  .tile {
+    background: var(--card-hi); border: 1px solid var(--line);
+    border-radius: 13px; padding: 12px 14px;
+    transition: border-color .18s;
+  }
+  .tile:hover { border-color: var(--line-hi); }
+  .tile .k { font-size: 11px; color: var(--dim2); letter-spacing: .05em; }
+  .tile .v {
+    font-size: 23px; font-weight: 600; margin-top: 3px;
+    letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+  }
+  .tile .v small { font-size: 12px; color: var(--dim2); font-weight: 400; margin-left: 2px; }
+  .tile.warm .v { color: var(--amber); }
+  .tile.hot .v { color: var(--red); }
+
+  /* ---------- 折线 ---------- */
+  .chartwrap { margin-top: 4px; }
+  .chart { width: 100%; height: 74px; display: block; overflow: visible; }
+  .chart .grid-line { stroke: rgba(255,255,255,.05); stroke-width: 1; }
+  .chart .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .chart .line.cpu { stroke: var(--teal); }
+  .chart .line.sys { stroke: var(--blue); }
+  .legend { display: flex; gap: 16px; font-size: 11px; color: var(--dim2); margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* ---------- 分段控件 ---------- */
+  .seg {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    gap: 4px; background: rgba(0,0,0,.28);
+    border: 1px solid var(--line); border-radius: 13px; padding: 4px;
+  }
+  .seg button {
+    background: transparent; border: 0; color: var(--dim);
+    padding: 10px 8px; border-radius: 10px; font: inherit; font-size: 13px;
+    cursor: pointer; transition: all .18s;
+  }
+  .seg button:hover { color: var(--txt); background: rgba(255,255,255,.045); }
+  .seg button.on {
+    background: linear-gradient(180deg, rgba(91,157,255,.22), rgba(91,157,255,.12));
+    color: #cfe0ff; font-weight: 560;
+    box-shadow: inset 0 0 0 1px rgba(91,157,255,.35), 0 2px 10px -4px rgba(91,157,255,.5);
+  }
+
+  /* ---------- 预设 ---------- */
+  .presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media (max-width: 480px) { .presets { grid-template-columns: 1fr; } }
+  .preset {
+    background: var(--card-hi); border: 1px solid var(--line);
+    border-radius: 13px; padding: 14px 12px; cursor: pointer;
+    color: var(--txt); font: inherit; text-align: left;
+    transition: all .18s;
+  }
+  .preset:hover { border-color: var(--line-hi); background: rgba(255,255,255,.07); transform: translateY(-1px); }
+  .preset:active { transform: translateY(0); }
+  .preset .pn { font-size: 14px; font-weight: 560; }
+  .preset .pd { font-size: 11px; color: var(--dim2); margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  /* ---------- 滑块 ---------- */
+  .row { margin: 16px 0; }
+  .row:last-child { margin-bottom: 4px; }
+  .rowhead {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 9px; font-size: 13px;
+  }
+  .rowhead .lbl { color: var(--dim); }
+  .rowhead .val { font-variant-numeric: tabular-nums; }
+  .rowhead .val b { font-size: 16px; font-weight: 600; }
+  .rowhead .val span { color: var(--dim2); font-size: 12px; margin-left: 4px; }
+
+  input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 20px; background: transparent; cursor: pointer; margin: 0;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 6px; border-radius: 999px;
+    background: linear-gradient(90deg,
+      var(--accent, var(--blue)) 0 var(--pct, 40%),
+      rgba(255,255,255,.08) var(--pct, 40%) 100%);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; margin-top: -6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.12);
+    transition: transform .15s;
+  }
+  input[type=range]:active::-webkit-slider-thumb { transform: scale(1.14); }
+  input[type=range]::-moz-range-track {
+    height: 6px; border-radius: 999px; background: rgba(255,255,255,.08);
+  }
+  input[type=range]::-moz-range-progress {
+    height: 6px; border-radius: 999px; background: var(--accent, var(--blue));
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 18px; height: 18px; border: 0; border-radius: 50%; background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,.55);
+  }
+  #sl-cpu { --accent: var(--teal); }
+  #sl-sys { --accent: var(--blue); }
+
+  /* ---------- 曲线 ---------- */
+  .curves { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 640px) { .curves { grid-template-columns: 1fr; gap: 16px; } }
+  .curve-head {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 12px; color: var(--dim); margin-bottom: 10px;
+  }
+  table.curve { width: 100%; border-collapse: separate; border-spacing: 0 6px; }
+  table.curve td { padding: 0; vertical-align: middle; }
+  table.curve td.arrow { width: 34px; text-align: center; color: var(--dim2); font-size: 11px; }
+  table.curve input {
+    width: 100%; background: rgba(0,0,0,.28);
+    border: 1px solid var(--line); color: var(--txt);
+    border-radius: 9px; padding: 8px 10px; font: inherit; font-size: 13px;
+    font-variant-numeric: tabular-nums; text-align: center;
+    transition: border-color .15s, background .15s;
+    -moz-appearance: textfield;
+  }
+  table.curve input::-webkit-outer-spin-button,
+  table.curve input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  table.curve input:focus {
+    outline: none; border-color: rgba(91,157,255,.55);
+    background: rgba(91,157,255,.07);
+  }
+
+  /* ---------- 按钮 ---------- */
+  .btnrow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  button.btn {
+    background: var(--card-hi); border: 1px solid var(--line);
+    color: var(--txt); border-radius: 11px; padding: 10px 16px;
+    font: inherit; font-size: 13px; cursor: pointer;
+    transition: all .16s;
+  }
+  button.btn:hover { background: rgba(255,255,255,.08); border-color: var(--line-hi); }
+  button.btn:active { transform: translateY(1px); }
+  button.btn.primary {
+    background: linear-gradient(180deg, rgba(91,157,255,.9), rgba(74,138,235,.9));
+    border-color: transparent; color: #05101f; font-weight: 560;
+    box-shadow: 0 6px 18px -8px rgba(91,157,255,.8);
+  }
+  button.btn.primary:hover { filter: brightness(1.08); }
+  button.btn.danger { color: #ffb3b8; border-color: rgba(255,95,109,.3); }
+  button.btn.danger:hover { background: rgba(255,95,109,.12); }
+
+  /* ---------- 状态栏 ---------- */
+  .statusline {
+    display: flex; flex-wrap: wrap; gap: 6px 22px;
+    font-size: 12px; color: var(--dim2); margin-top: 4px;
+  }
+  .statusline b { color: var(--dim); font-weight: 550; font-variant-numeric: tabular-nums; }
+
+  /* ---------- 横幅 ---------- */
+  .banner {
+    display: none; border-radius: 13px; padding: 12px 15px;
+    font-size: 13px; margin-bottom: 14px; border: 1px solid;
+    align-items: center; gap: 9px;
+  }
+  .banner.show { display: flex; }
+  .banner.warn { background: rgba(255,181,69,.09); border-color: rgba(255,181,69,.28); color: #ffcf87; }
+  .banner.bad { background: rgba(255,95,109,.09); border-color: rgba(255,95,109,.28); color: #ffa3aa; }
+  .banner svg { width: 15px; height: 15px; flex: none; }
+
+  .hint { color: var(--dim2); font-size: 11.5px; line-height: 1.6; margin-top: 10px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#05101f" stroke-width="2.1"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 12c1.5-2.5 1-5.5-1-7-1.5-1.1-3.5-1-4.7.4C5 6.8 5.2 8.9 6.6 10"/>
+        <path d="M12 12c2.5 1.5 5.5 1 7-1 1.1-1.5 1-3.5-.4-4.7"/>
+        <path d="M12 12c-1.5 2.5-1 5.5 1 7"/>
+        <circle cx="12" cy="12" r="1.6" fill="#05101f" stroke="none"/>
+      </svg>
+    </div>
+    <div>
+      <h1>风扇控制</h1>
+      <div class="sub">DH2600 · /proc/it86/fan</div>
+    </div>
+  </div>
+
+  <div class="pills">
+    <span class="pill"><span class="dot live ok" id="d-live"></span><span id="s-live">连接中</span></span>
+    <span class="pill"><span class="dot" id="d-ctl"></span><span id="s-ctl">—</span></span>
+    <span class="pill"><span class="dot" id="d-trip"></span><span id="s-trip">—</span></span>
+  </div>
+</header>
+
+<div id="banner" class="banner"></div>
+
+<!-- 风扇仪表 -->
+<div class="grid hero" style="margin-bottom:14px">
+  <div class="card">
+    <div class="fan">
+      <svg class="gauge cpu" viewBox="0 0 140 140">
+        <circle class="track" cx="70" cy="70" r="52"/>
+        <circle class="arc" id="g-cpu" cx="70" cy="70" r="52"
+                transform="rotate(-90 70 70)" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+      </svg>
+      <div class="gauge-center">
+        <div class="rpmval" id="rpm-cpu">—</div>
+        <div class="unit">RPM</div>
+      </div>
+      <div class="fanlabel"><span class="swatch cpu"></span><b>CPU 风扇</b></div>
+      <div class="tgt">目标 PWM <b id="tgt-cpu">—</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="fan">
+      <svg class="gauge sys" viewBox="0 0 140 140">
+        <circle class="track" cx="70" cy="70" r="52"/>
+        <circle class="arc" id="g-sys" cx="70" cy="70" r="52"
+                transform="rotate(-90 70 70)" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+      </svg>
+      <div class="gauge-center">
+        <div class="rpmval" id="rpm-sys">—</div>
+        <div class="unit">RPM</div>
+      </div>
+      <div class="fanlabel"><span class="swatch sys"></span><b>系统风扇</b></div>
+      <div class="tgt">目标 PWM <b id="tgt-sys">—</b></div>
+    </div>
+  </div>
+</div>
+
+<!-- 温度 + 趋势 -->
+<div class="card" style="margin-bottom:14px">
+  <h2>温度</h2>
+  <div class="temps" id="temps"></div>
+  <div class="chartwrap">
+    <svg class="chart" id="spark" viewBox="0 0 400 74" preserveAspectRatio="none"></svg>
+    <div class="legend">
+      <span><span class="swatch cpu"></span>CPU 风扇</span>
+      <span><span class="swatch sys"></span>系统风扇</span>
+    </div>
+  </div>
+</div>
+
+<!-- 模式 -->
+<div class="card" style="margin-bottom:14px">
+  <h2>运行模式</h2>
+  <div class="seg">
+    <button class="modebtn" data-mode="auto">曲线自动</button>
+    <button class="modebtn" data-mode="manual">手动固定</button>
+    <button class="modebtn" data-mode="off">停手交还</button>
+  </div>
+  <div class="hint">「停手」会停止写入，UGOS hwmonitor 将在数十秒内自动接管风扇。</div>
+</div>
+
+<!-- 预设 -->
+<div class="card" style="margin-bottom:14px">
+  <h2>快速预设</h2>
+  <div class="presets">
+    <button class="preset" data-preset="silent">
+      <div class="pn">静音</div>
+      <div class="pd" id="pd-silent">CPU 64 · SYS 70</div>
+    </button>
+    <button class="preset" data-preset="balanced">
+      <div class="pn">均衡</div>
+      <div class="pd" id="pd-balanced">CPU 110 · SYS 90</div>
+    </button>
+    <button class="preset" data-preset="performance">
+      <div class="pn">性能</div>
+      <div class="pd" id="pd-performance">CPU 230 · SYS 235</div>
+    </button>
+  </div>
+</div>
+
+<!-- 手动 -->
+<div class="card" style="margin-bottom:14px">
+  <h2>手动 PWM</h2>
+  <div class="row">
+    <div class="rowhead">
+      <span class="lbl">CPU 风扇</span>
+      <span class="val"><b id="v-cpu">110</b><span id="p-cpu">43%</span></span>
+    </div>
+    <input type="range" id="sl-cpu" min="1" max="255" value="110">
+  </div>
+  <div class="row">
+    <div class="rowhead">
+      <span class="lbl">系统风扇</span>
+      <span class="val"><b id="v-sys">90</b><span id="p-sys">35%</span></span>
+    </div>
+    <input type="range" id="sl-sys" min="1" max="255" value="90">
+  </div>
+  <div class="hint">拖动即生效并自动切到手动模式。PWM 范围 1–255。</div>
+</div>
+
+<!-- 曲线 -->
+<div class="card" style="margin-bottom:14px">
+  <h2>温度曲线</h2>
+  <div class="curves">
+    <div>
+      <div class="curve-head"><span class="swatch cpu"></span>CPU 温度 → CPU 风扇</div>
+      <table class="curve" id="cur-cpu"></table>
+    </div>
+    <div>
+      <div class="curve-head"><span class="swatch sys"></span>存储侧温度 → 系统风扇</div>
+      <table class="curve" id="cur-sys"></table>
+    </div>
+  </div>
+  <div class="btnrow">
+    <button class="btn" id="btn-load-ugos">载入 UGOS 曲线</button>
+    <button class="btn primary" id="btn-save-curve">保存曲线</button>
+  </div>
+  <div class="hint">断点按温度升序，相邻两点之间线性插值；下限由服务端钳制以防停转。</div>
+</div>
+
+<!-- 状态 -->
+<div class="card">
+  <h2>运行状态</h2>
+  <div class="statusline">
+    <span>写入次数 <b id="s-writes">0</b></span>
+    <span>上次写入 <b id="s-lastwrite">—</b></span>
+    <span>写入间隔 <b id="s-interval">—</b> s</span>
+    <span>运行时长 <b id="s-uptime">—</b></span>
+  </div>
+  <div class="statusline" id="s-error" style="color:#ffa3aa;margin-top:8px"></div>
+  <div class="btnrow">
+    <button class="btn danger" id="btn-handback">停止控制，交还 UGOS</button>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = { snap: null, hist: { cpu: [], sys: [] }, editing: false };
+
+// 仪表盘量程（用于把 RPM 映射成弧长）
+const SCALE = { cpu: 4600, sys: 2100 };
+const CIRC = 2 * Math.PI * 52;
+
+/* ---------------- 鉴权 ---------------- */
+function token() { return localStorage.getItem('fanctl_token') || ''; }
+function authHeaders() {
+  const t = token();
+  return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(opts.headers || {}) },
+  });
+  if (res.status === 401) {
+    const t = prompt('需要访问令牌（TOKEN）:');
+    if (t) { localStorage.setItem('fanctl_token', t.trim()); return api(path, opts); }
+    throw new Error('unauthorized');
+  }
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+/* ---------------- 渲染 ---------------- */
+function setDot(el, cls) { if (el) el.className = 'dot ' + cls; }
+
+function setGauge(el, rpm, scale) {
+  if (!el) return;
+  const ratio = rpm == null ? 0 : Math.max(0, Math.min(1, rpm / scale));
+  el.style.strokeDasharray = CIRC;
+  el.style.strokeDashoffset = CIRC * (1 - ratio);
+}
+
+function tempClass(v, warm, hot) {
+  if (v == null) return '';
+  if (v >= hot) return 'hot';
+  if (v >= warm) return 'warm';
+  return '';
+}
+
+function render(s) {
+  state.snap = s;
+
+  // 仪表
+  const rc = s.rpm.cpu, rs = s.rpm.sys;
+  $('rpm-cpu').textContent = rc ?? '—';
+  $('rpm-sys').textContent = rs ?? '—';
+  setGauge($('g-cpu'), rc, SCALE.cpu);
+  setGauge($('g-sys'), rs, SCALE.sys);
+  $('tgt-cpu').textContent = s.target.cpu ?? '—';
+  $('tgt-sys').textContent = s.target.sys ?? '—';
+
+  // 温度
+  const t = s.temps || {};
+  const tiles = [
+    ['CPU', t.cpu, 70, 85],
+    ['NVMe', t.nvme, 55, 70],
+    ['机箱', t.chipset, 45, 55],
+    ['存储侧', t.sys_max, 50, 60],
+  ].filter(([, v]) => v !== null && v !== undefined);
+  $('temps').innerHTML = tiles.map(([k, v, w, h]) => `
+    <div class="tile ${tempClass(v, w, h)}">
+      <div class="k">${k}</div>
+      <div class="v">${v}<small>°C</small></div>
+    </div>`).join('');
+
+  // 模式
+  document.querySelectorAll('.modebtn').forEach((b) => {
+    b.classList.toggle('on', b.dataset.mode === s.mode);
+  });
+
+  // 滑块
+  if (!state.editing) {
+    $('sl-cpu').value = s.settings.manual_cpu;
+    $('sl-sys').value = s.settings.manual_sys;
+  }
+  syncSliderLabels();
+
+  // 曲线
+  if (!state.editing) renderCurves(s.settings.cpu_curve, s.settings.sys_curve);
+
+  // 预设文案
+  if (s.presets) {
+    for (const [k, p] of Object.entries(s.presets)) {
+      const el = $('pd-' + k);
+      if (el) el.textContent = `CPU ${p.cpu} · SYS ${p.sys}`;
+    }
+  }
+
+  // 状态
+  const ctlOk = s.status === 'running';
+  setDot($('d-ctl'), ctlOk ? 'ok' : (s.status === 'error' ? 'bad' : 'warn'));
+  $('s-ctl').textContent = ({
+    running: '控制中', suspended: '已挂起', stopped: '已停手',
+    error: '接口异常', starting: '启动中',
+  })[s.status] || s.status;
+
+  setDot($('d-trip'), s.trip ? 'bad' : 'ok');
+  $('s-trip').textContent = s.trip ? '超温满转' : '温度正常';
+
+  $('s-writes').textContent = s.writes;
+  $('s-lastwrite').textContent = s.last_write
+    ? new Date(s.last_write * 1000).toLocaleTimeString('zh-CN') : '—';
+  $('s-interval').textContent = s.settings.interval;
+  $('s-uptime').textContent = fmtUptime(s.uptime);
+  $('s-error').textContent = s.last_error ? ('错误：' + s.last_error) : '';
+
+  // 横幅
+  const banner = $('banner');
+  const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
+  if (s.status === 'error') {
+    banner.className = 'banner bad show';
+    banner.innerHTML = ICON + '<span>无法访问 /proc/it86/fan：' + (s.last_error || '未知错误') + '</span>';
+  } else if (s.message) {
+    banner.className = 'banner warn show';
+    banner.innerHTML = ICON + '<span>' + s.message + '</span>';
+  } else if (s.mode === 'off') {
+    banner.className = 'banner warn show';
+    banner.innerHTML = ICON + '<span>已停手，UGOS hwmonitor 正在接管风扇。</span>';
+  } else {
+    banner.className = 'banner';
+  }
+
+  // 历史
+  if (rc != null) state.hist.cpu.push(rc);
+  if (rs != null) state.hist.sys.push(rs);
+  for (const k of ['cpu', 'sys']) {
+    if (state.hist[k].length > 80) state.hist[k].shift();
+  }
+  drawSpark();
+}
+
+function fmtUptime(sec) {
+  sec = Math.floor(sec || 0);
+  const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600);
+  const m = Math.floor(sec % 3600 / 60);
+  if (d) return `${d} 天 ${h} 时`;
+  if (h) return `${h} 时 ${m} 分`;
+  return `${m} 分`;
+}
+
+function drawSpark() {
+  const svg = $('spark');
+  const W = 400, H = 74, padT = 6, padB = 4;
+  const all = [...state.hist.cpu, ...state.hist.sys];
+  if (all.length < 2) { svg.innerHTML = ''; return; }
+
+  const max = Math.max(...all, 1200) * 1.12;
+  const step = W / 79;
+
+  const build = (arr) => {
+    if (arr.length < 2) return null;
+    const pts = arr.map((v, i) => [
+      (W - (arr.length - 1 - i) * step),
+      H - padB - (v / max) * (H - padT - padB),
+    ]);
+    return pts;
+  };
+
+  const toLine = (pts) => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const toArea = (pts) => `${toLine(pts)} L${pts[pts.length - 1][0].toFixed(1)},${H} L${pts[0][0].toFixed(1)},${H} Z`;
+
+  const cpuPts = build(state.hist.cpu);
+  const sysPts = build(state.hist.sys);
+
+  let out = `
+    <defs>
+      <linearGradient id="gc" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#35d6a4" stop-opacity=".28"/>
+        <stop offset="100%" stop-color="#35d6a4" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="gs" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#5b9dff" stop-opacity=".22"/>
+        <stop offset="100%" stop-color="#5b9dff" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <line class="grid-line" x1="0" y1="${H * 0.33}" x2="${W}" y2="${H * 0.33}"/>
+    <line class="grid-line" x1="0" y1="${H * 0.66}" x2="${W}" y2="${H * 0.66}"/>`;
+
+  if (sysPts) out += `<path d="${toArea(sysPts)}" fill="url(#gs)"/><path class="line sys" d="${toLine(sysPts)}"/>`;
+  if (cpuPts) out += `<path d="${toArea(cpuPts)}" fill="url(#gc)"/><path class="line cpu" d="${toLine(cpuPts)}"/>`;
+
+  svg.innerHTML = out;
+}
+
+function renderCurves(cpu, sys) {
+  for (const [id, pts] of [['cur-cpu', cpu], ['cur-sys', sys]]) {
+    const tb = $(id);
+    if (!tb) continue;
+    tb.innerHTML = pts.map(([t, p], i) => `
+      <tr>
+        <td><input type="number" data-c="${id}" data-i="${i}" data-f="t" value="${t}" step="1"></td>
+        <td class="arrow">°C →</td>
+        <td><input type="number" data-c="${id}" data-i="${i}" data-f="p" value="${p}" min="1" max="255" step="1"></td>
+      </tr>`).join('');
+    tb.querySelectorAll('input').forEach((inp) => {
+      inp.addEventListener('input', () => { state.editing = true; });
+    });
+  }
+}
+
+function readCurve(id) {
+  const pts = [];
+  const tb = $(id);
+  if (!tb) return pts;
+  tb.querySelectorAll('input[data-f="t"]').forEach((tEl) => {
+    const i = tEl.dataset.i;
+    const pEl = tb.querySelector(`input[data-f="p"][data-i="${i}"]`);
+    const t = parseFloat(tEl.value), p = parseInt(pEl.value, 10);
+    if (!Number.isNaN(t) && !Number.isNaN(p)) pts.push([t, p]);
+  });
+  return pts.sort((a, b) => a[0] - b[0]);
+}
+
+/* ---------------- 交互 ---------------- */
+function syncSliderLabels() {
+  const c = +$('sl-cpu').value, s = +$('sl-sys').value;
+  const pc = Math.round(c / 255 * 100), ps = Math.round(s / 255 * 100);
+  $('v-cpu').textContent = c; $('p-cpu').textContent = pc + '%';
+  $('v-sys').textContent = s; $('p-sys').textContent = ps + '%';
+  $('sl-cpu').style.setProperty('--pct', pc + '%');
+  $('sl-sys').style.setProperty('--pct', ps + '%');
+}
+
+let sliderTimer = null;
+function onSlider() {
+  state.editing = true;
+  syncSliderLabels();
+  clearTimeout(sliderTimer);
+  sliderTimer = setTimeout(async () => {
+    try {
+      const s = await api('/api/settings', {
+        method: 'POST',
+        body: JSON.stringify({
+          mode: 'manual',
+          manual_cpu: +$('sl-cpu').value,
+          manual_sys: +$('sl-sys').value,
+        }),
+      });
+      state.editing = false;
+      render(s);
+    } catch (e) { state.editing = false; }
+  }, 250);
+}
+$('sl-cpu').addEventListener('input', onSlider);
+$('sl-sys').addEventListener('input', onSlider);
+
+document.querySelectorAll('.modebtn').forEach((b) => {
+  b.addEventListener('click', async () => {
+    render(await api('/api/settings', {
+      method: 'POST', body: JSON.stringify({ mode: b.dataset.mode }),
+    }));
+  });
+});
+
+document.querySelectorAll('[data-preset]').forEach((b) => {
+  b.addEventListener('click', async () => {
+    render(await api('/api/preset', {
+      method: 'POST', body: JSON.stringify({ name: b.dataset.preset }),
+    }));
+  });
+});
+
+$('btn-load-ugos').addEventListener('click', async () => {
+  try {
+    state.editing = false;
+    render(await api('/api/ugos-curve', { method: 'POST' }));
+  } catch (e) { alert('载入失败：' + e.message); }
+});
+
+$('btn-save-curve').addEventListener('click', async () => {
+  const s = await api('/api/settings', {
+    method: 'POST',
+    body: JSON.stringify({
+      cpu_curve: readCurve('cur-cpu'),
+      sys_curve: readCurve('cur-sys'),
+    }),
+  });
+  state.editing = false;
+  render(s);
+});
+
+$('btn-handback').addEventListener('click', async () => {
+  render(await api('/api/handback', { method: 'POST' }));
+});
+
+/* ---------------- 实时流 ---------------- */
+function setLive(ok) {
+  setDot($('d-live'), ok ? 'ok live' : 'bad');
+  $('s-live').textContent = ok ? '实时' : '断开';
+}
+
+function connect() {
+  const t = token();
+  const es = new EventSource('/api/stream' + (t ? '?token=' + encodeURIComponent(t) : ''));
+  es.onopen = () => setLive(true);
+  es.onmessage = (ev) => {
+    setLive(true);
+    try { render(JSON.parse(ev.data)); } catch (_) {}
+  };
+  es.onerror = () => {
+    setLive(false);
+    es.close();
+    setTimeout(connect, 3000);
+  };
+}
+
+setLive(false);
+connect();
+api('/api/status').then(render).catch(() => {});
+</script>
+</body>
+</html>

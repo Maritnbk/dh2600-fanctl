@@ -1,0 +1,36 @@
+services:
+  fanctl:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dh2600-fanctl:latest
+    container_name: dh2600-fanctl
+    restart: unless-stopped
+    network_mode: bridge
+    # 不需要 privileged / SYS_RAWIO / devices
+    ports:
+      - "2600:2600"
+    volumes:
+      # 风扇接口：写是 0222（谁都能写），读需要 root
+      - /proc/it86:/it86:rw
+      # 温度源。/sys/class/hwmon 里全是相对符号链接，只挂它容器内解析不了，
+      # 必须同时挂 /sys/devices 才能让链接指到真实文件。
+      - /sys/class/hwmon:/host/hwmon:ro
+      - /sys/devices:/host/devices:ro
+      # UGOS 曲线参数（只读参考）
+      - /etc/default:/host/default:ro
+    environment:
+      - INTERVAL=3
+      # 留空则不鉴权（仅限纯内网）。建议设置一个随机串。
+      - TOKEN=${FANCTL_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:2600/healthz',timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
