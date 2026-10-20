@@ -7,9 +7,31 @@
 - **不需要** `--privileged`、`SYS_RAWIO`、`/dev/port`、内核模块编译
 - **不需要** 停用 UGOS `hwmonitor`（它继续运行，作为失效兜底）
 
+![version](https://img.shields.io/badge/version-v1.0-blue)
+![license](https://img.shields.io/badge/license-MIT-green)
+
 ---
 
 ## 快速开始
+
+### 方式一：用预构建镜像（推荐）
+
+```bash
+docker pull ghcr.io/maritnbk/dh2600-fanctl:v1.0
+```
+
+`docker-compose.yml` 里把 `build:` 换成 `image:`：
+
+```yaml
+services:
+  fanctl:
+    image: ghcr.io/maritnbk/dh2600-fanctl:v1.0
+    # build: ...  ← 删掉或用注释掉
+```
+
+然后 `docker compose up -d`。
+
+### 方式二：本地构建
 
 ```bash
 cd /volume1/docker/fanctl
@@ -25,6 +47,27 @@ docker compose logs -f
 
 ---
 
+## 镜像
+
+| 项 | 值 |
+|---|---|
+| 镜像地址 | `ghcr.io/maritnbk/dh2600-fanctl` |
+| 当前版本 | `v1.0`（也打 `latest`） |
+| 架构 | `linux/amd64` |
+| 基础镜像 | `python:3.12-slim` |
+
+可用标签：`v1.0`、`1.0`、`1`、`latest`、`main`。
+
+```bash
+# 查看所有版本
+docker pull ghcr.io/maritnbk/dh2600-fanctl:v1.0
+docker pull ghcr.io/maritnbk/dh2600-fanctl:latest
+```
+
+镜像由 GitHub Actions 在打 tag 时自动构建发布，见 `.github/workflows/docker.yml`。
+
+---
+
 ## 配置
 
 `docker-compose.yml`：
@@ -35,9 +78,11 @@ docker compose logs -f
 | 端口 | `2600:2600` | Web UI |
 | 卷 | `/proc/it86:/it86:rw` | 风扇接口 |
 | 卷 | `/sys/class/hwmon:/host/hwmon:ro` | 温度源 |
+| 卷 | `/sys/devices:/host/devices:ro` | 温度源符号链接解析 |
 | 卷 | `/etc/default:/host/default:ro` | UGOS 曲线参数 |
 | 环境 | `INTERVAL=3` | 写入间隔（秒），2–5 之间较合适 |
 | 环境 | `TOKEN=...` | 访问令牌，留空则不鉴权 |
+
 
 ### 为什么容器要 root
 

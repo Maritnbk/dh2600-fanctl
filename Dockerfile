@@ -3,17 +3,27 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# 国内网络下 pypi.org 不通，走镜像源；可用 build-arg 覆盖
+# PyPI 源。默认走国内镜像（DH2600 所在网络 pypi.org 不通）；
+# CI 或其他环境可用 --build-arg 覆盖。
 ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
 ARG PIP_TRUSTED_HOST=mirrors.aliyun.com
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir \
-      --index-url "$PIP_INDEX_URL" \
-      --trusted-host "$PIP_TRUSTED_HOST" \
-      -r requirements.txt
+
+# PIP_TRUSTED_HOST 允许为空（例如直连 pypi.org 时不需要）
+RUN set -eux; \
+    if [ -n "$PIP_TRUSTED_HOST" ]; then \
+      pip install --no-cache-dir \
+        --index-url "$PIP_INDEX_URL" \
+        --trusted-host "$PIP_TRUSTED_HOST" \
+        -r requirements.txt; \
+    else \
+      pip install --no-cache-dir \
+        --index-url "$PIP_INDEX_URL" \
+        -r requirements.txt; \
+    fi
 
 COPY app/ /app/
 
