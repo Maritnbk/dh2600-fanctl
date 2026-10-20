@@ -3,8 +3,9 @@ name: Build and publish container image
 on:
   push:
     branches: [main]
-    # 匹配 v1.0 / v1.0.0 / v2.1.3 等任意 v 开头的标签
-    tags: ['v*']
+    # 版本标签统一为不带 v 前缀的形式（1.0 / 1.2.3）；
+    # 同时兼容 v1.0 这类旧写法，计算时会自动去掉 v。
+    tags: ['[0-9]*', 'v*']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -38,7 +39,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 自己算标签，避免 metadata-action 的 semver 规则在 v1.0（两段式）上报错。
+      # 自己算标签，避免 metadata-action 的 semver 规则在两段式版本（1.0）上报错。
       # 注意：GHCR 要求仓库名全小写，而 GitHub 用户名可能含大写（如 Maritnbk）。
       - name: Compute image tags
         id: tags
@@ -50,9 +51,10 @@ jobs:
           REF_NAME="${{ github.ref_name }}"
 
           if [ "$REF_TYPE" = "tag" ]; then
-            V="${REF_NAME#v}"                      # v1.0 -> 1.0
-            TAGS="${IMG}:${REF_NAME},${IMG}:${V}"
-            # 只有三段式才补主版本/次版本别名
+            # 统一去掉 v 前缀：v1.0 -> 1.0
+            V="${REF_NAME#v}"
+            TAGS="${IMG}:${V}"
+            # 三段式才补次版本/主版本别名
             if echo "$V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
               MAJOR="${V%%.*}"
               MINOR="$(echo "$V" | cut -d. -f1-2)"

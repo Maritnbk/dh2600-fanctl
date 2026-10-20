@@ -7,7 +7,7 @@
 - **不需要** `--privileged`、`SYS_RAWIO`、`/dev/port`、内核模块编译
 - **不需要** 停用 UGOS `hwmonitor`（它继续运行，作为失效兜底）
 
-![version](https://img.shields.io/badge/version-v1.0-blue)
+![version](https://img.shields.io/badge/version-1.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -17,7 +17,7 @@
 ### 方式一：用预构建镜像（推荐）
 
 ```bash
-docker pull ghcr.io/maritnbk/dh2600-fanctl:v1.0
+docker pull ghcr.io/maritnbk/dh2600-fanctl:1.0
 ```
 
 `docker-compose.yml` 里把 `build:` 换成 `image:`：
@@ -25,7 +25,7 @@ docker pull ghcr.io/maritnbk/dh2600-fanctl:v1.0
 ```yaml
 services:
   fanctl:
-    image: ghcr.io/maritnbk/dh2600-fanctl:v1.0
+    image: ghcr.io/maritnbk/dh2600-fanctl:1.0
     # build: ...  ← 删掉或用注释掉
 ```
 
@@ -52,14 +52,14 @@ docker compose logs -f
 | 项 | 值 |
 |---|---|
 | 镜像地址 | `ghcr.io/maritnbk/dh2600-fanctl` |
-| 当前版本 | `v1.0`（也打 `1.0`、`latest`） |
+| 当前版本 | `1.0`（也打 `latest`） |
 | 架构 | `linux/amd64` |
 | 基础镜像 | `python:3.12-slim` |
 | 大小 | 158 MB |
 
 ```bash
 # 拉取
-docker pull ghcr.io/maritnbk/dh2600-fanctl:v1.0
+docker pull ghcr.io/maritnbk/dh2600-fanctl:1.0
 
 # 或固定到次版本 / 最新
 docker pull ghcr.io/maritnbk/dh2600-fanctl:1.0
@@ -67,12 +67,13 @@ docker pull ghcr.io/maritnbk/dh2600-fanctl:latest
 ```
 
 镜像由 GitHub Actions 在打 tag 时自动构建发布，见 `.github/workflows/docker.yml`。
+版本标签统一使用**不带 `v` 前缀**的形式（如 `1.0`）；若推 `v1.0` 也会自动规范化为 `1.0`。
 标签规则：
 
 | Git 标签 | 生成的镜像标签 |
 |---|---|
-| `v1.0` | `v1.0`、`1.0`、`latest` |
-| `v1.2.3` | `v1.2.3`、`1.2.3`、`1.2`、`1`、`latest` |
+| `1.0` | `1.0`、`latest` |
+| `1.2.3` | `1.2.3`、`1.2`、`1`、`latest` |
 | `main` 分支推送 | `main`、`latest` |
 
 
